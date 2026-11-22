@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--BODY-START-->
+<title>Precificador de Serviços</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#14313a">
+<meta name="description" content="Calcule quanto cobrar por um serviço, com custos, regime tributário e a reforma tributária (CBS e IBS).">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: tela de orçamento (entradas do trabalho + preço lado a lado; empilha no celular) e tela de configuração da empresa. */
+:root {
+  --bg: #f3f5f4; --surface: #ffffff; --ink: #15232b; --muted: #5b6a70; --line: #d9e0de;
+  --accent: #0e6f62; --accent-soft: #e1f1ed; --warn: #9a5b00; --warn-soft: #fbf0dc;
+  --c-custo: #44606b; --c-trib: #b7612c; --c-var: #8a7a3c; --c-lucro: #0e6f62; --c-fora: #6b5aa6;
+  --f-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1719; --surface: #162125; --ink: #e5ecea; --muted: #97a6a9; --line: #2a3a3e;
+  --accent: #4fc2ad; --accent-soft: #173a35; --warn: #f0b45a; --warn-soft: #3a2c14;
+  --c-custo: #8fa9b2; --c-trib: #e08a52; --c-var: #c9b76a; --c-lucro: #4fc2ad; --c-fora: #a596dd; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1719; --surface: #162125; --ink: #e5ecea; --muted: #97a6a9; --line: #2a3a3e;
+  --accent: #4fc2ad; --accent-soft: #173a35; --warn: #f0b45a; --warn-soft: #3a2c14;
+  --c-custo: #8fa9b2; --c-trib: #e08a52; --c-var: #c9b76a; --c-lucro: #4fc2ad; --c-fora: #a596dd; color-scheme: dark }
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 16px 40px }
+header.top { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 16px }
+h1 { font: 700 1.35rem/1.15 var(--f-display); margin: 0; letter-spacing: -0.01em }
+h2 { font: 600 1.05rem/1.3 var(--f-display); margin: 0 }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r) }
+.body { padding: 16px; display: grid; gap: 14px }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px }
+label.f { display: grid; gap: 4px; font-size: .84rem; color: var(--muted); min-width: 0 }
+input, select { font: 15px var(--f-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0 }
+input.num { font-family: var(--f-num); font-variant-numeric: tabular-nums }
+input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.hint { font-size: .8rem; color: var(--muted); margin: 0 }
+.chk { display: flex; gap: 8px; align-items: flex-start; font-size: .9rem }
+.chk input { width: auto; margin-top: 4px }
+button { font: 500 .9rem var(--f-body); border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 7px 12px; cursor: pointer }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--surface) }
+button.link { border: 0; background: none; color: var(--accent); padding: 2px 0; text-decoration: underline }
+.mono, .total-line b { font-family: var(--f-num); font-variant-numeric: tabular-nums; font-weight: 500 }
+.code { font-family: var(--f-num); color: var(--accent); font-size: .85rem }
+.chip { display: inline-block; font: 500 .75rem var(--f-num); padding: 1px 8px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line); color: var(--muted) }
+.chip.good { color: var(--accent); border-color: var(--accent) }
+.chip.warn { color: var(--warn); border-color: var(--warn) }
+.alert { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 8px 10px; font-size: .84rem; margin: 0 }
+.eyebrow { font: 500 .72rem var(--f-num); letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+
+/* Orçamento rápido */
+.quick { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 16px; align-items: start }
+@media (max-width: 860px) { .quick { grid-template-columns: minmax(0, 1fr) } }
+.svc { display: grid; gap: 8px }
+.svc-now { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap }
+.svc-now b { font-weight: 600 }
+.recents { display: flex; flex-wrap: wrap; gap: 6px }
+.recents button { font-size: .8rem; padding: 3px 10px; border-radius: 99px }
+.recents button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft) }
+.results { display: grid; max-height: 280px; overflow: auto; border: 1px solid var(--line); border-radius: 8px }
+.results button { text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; background: transparent }
+.results button:hover { background: var(--accent-soft) }
+.q { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: .9rem }
+.q .opts { display: flex; gap: 8px }
+.q .opts button[aria-pressed="true"] { background: var(--accent); color: var(--surface); border-color: var(--accent) }
+.main-in { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px }
+@media (max-width: 520px) { .main-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) } .main-in label:first-child { grid-column: 1 / -1 } }
+.main-in input { font: 500 1.35rem var(--f-num); padding: 10px 12px }
+.margin-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .9rem }
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; overflow: hidden }
+.stepper button { border: 0; border-radius: 0; padding: 6px 12px; font-size: 1rem }
+.stepper input { width: 64px; border: 0; border-radius: 0; text-align: center; background: var(--surface) }
+details.more > summary { cursor: pointer; color: var(--accent); font-size: .9rem; font-weight: 500 }
+details.more[open] > summary { margin-bottom: 12px }
+
+.price { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); overflow: hidden }
+@media (max-width: 860px) { .price { position: static } }
+.price-head { padding: 16px; display: grid; gap: 4px }
+.big { font: 700 2.6rem/1.05 var(--f-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0 16px 14px }
+.kpis div { display: grid; font-size: .78rem; color: var(--muted) }
+.kpis b { font: 500 .95rem var(--f-num); color: var(--ink); font-variant-numeric: tabular-nums }
+.bar { display: flex; height: 12px; border-radius: 4px; overflow: hidden; background: var(--line) }
+.bar i { display: block; height: 100% }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .78rem; color: var(--muted) }
+.legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; background: var(--dot) }
+.actions { display: flex; gap: 8px; padding: 0 16px 16px; flex-wrap: wrap }
+.actions button { flex: 1 1 auto }
+.sec { padding: 14px 16px; border-top: 1px dashed var(--line); display: grid; gap: 8px }
+.lines { display: grid; gap: 4px; font-size: .9rem }
+.lines div { display: flex; justify-content: space-between; gap: 12px }
+.lines div span:last-child { font-family: var(--f-num); font-variant-numeric: tabular-nums; white-space: nowrap }
+.lines .tot { border-top: 1px solid var(--line); padding-top: 4px; font-weight: 600 }
+.lines .sub { color: var(--muted); font-size: .84rem }
+details.det > summary { list-style: none; cursor: pointer; padding: 12px 16px; border-top: 1px solid var(--line); color: var(--accent); font-weight: 500; font-size: .9rem; display: flex; justify-content: space-between }
+details.det > summary::-webkit-details-marker { display: none }
+details.det > summary::after { content: "+"; font-family: var(--f-num) }
+details.det[open] > summary::after { content: "−" }
+.years { display: grid; gap: 3px }
+.yr { display: grid; grid-template-columns: 42px minmax(0, 1fr) 92px; gap: 8px; align-items: center; font-size: .82rem; border: 0; background: none; padding: 2px 0; text-align: left; border-radius: 4px }
+.yr .track { height: 10px; background: var(--bg); border-radius: 3px; overflow: hidden }
+.yr .track i { display: block; height: 100%; background: var(--c-custo) }
+.yr[aria-pressed="true"] { font-weight: 600 }
+.yr[aria-pressed="true"] .track i { background: var(--accent) }
+.yr .v { font-family: var(--f-num); text-align: right; font-variant-numeric: tabular-nums }
+.cmp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px }
+.cmp > div { border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 4px; font-size: .84rem }
+.cmp > div.best { border-color: var(--accent) }
+.cmp b { font: 600 .9rem var(--f-display) }
+.mobilebar { display: none }
+@media (max-width: 860px) {
+  .mobilebar:not([hidden]) { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; justify-content: space-between; align-items: center; gap: 12px;
+    background: var(--ink); color: var(--bg); padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)) }
+  .mobilebar b { font: 700 1.3rem var(--f-display); font-variant-numeric: tabular-nums }
+  .mobilebar button { background: transparent; color: var(--bg); border-color: var(--bg) }
+  .wrap { padding-bottom: 90px }
+}
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: .9rem; z-index: 9 }
+
+/* Configuração */
+.cfg { display: grid; gap: 12px; max-width: 760px }
+.fixos { display: grid; gap: 8px }
+.fixo { display: grid; grid-template-columns: minmax(0, 1fr) 120px 34px; gap: 8px }
+.fixo button { padding: 0; font-size: 1.1rem; color: var(--muted) }
+.total-line { display: flex; justify-content: space-between; font-size: .9rem; border-top: 1px dashed var(--line); padding-top: 8px }
+.foot { margin-top: 20px; font-size: .8rem; color: var(--muted); max-width: 70ch }
+@media (prefers-reduced-motion: no-preference) { .bar i, .yr .track i { transition: width .25s ease } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Precificador de Serviços</h1>
+    <nav style="display:flex;gap:8px">
+      <button type="button" id="go-orcamento" hidden>← Voltar ao orçamento</button>
+      <button type="button" id="go-empresa">Empresa e custos</button>
+    </nav>
+  </header>
+
+  <!-- ===== Tela 1: orçamento rápido ===== -->
+  <section id="view-orcamento">
+    <p class="alert" id="aviso-exemplo" hidden style="margin-bottom:12px">Os dados da empresa são de exemplo. <button type="button" class="link" id="cfg-agora">Preencher os da minha empresa</button></p>
+    <div class="quick">
+      <div class="card"><div class="body">
+        <div class="svc">
+          <span class="eyebrow">Serviço</span>
+          <div class="svc-now" id="svc-now"></div>
+          <div class="recents" id="recentes"></div>
+          <input id="busca" type="search" placeholder="Buscar outro serviço: nome ou código (ex.: 17.19)" autocomplete="off" aria-label="Buscar serviço">
+          <div class="results" id="resultados" hidden></div>
+          <div id="perguntas" class="svc"></div>
+        </div>
+
+        <div class="main-in">
+          <label class="f"><span>Tempo de execução (horas)</span><input id="t-horas" class="num" inputmode="decimal" data-k="trabalho.horas" data-num></label>
+          <label class="f"><span>Material (R$)</span><input id="t-materiais" class="num" inputmode="decimal" data-k="trabalho.materiais" data-num></label>
+          <label class="f"><span>Deslocamento (km)</span><input id="t-km" class="num" inputmode="decimal" data-k="trabalho.km" data-num></label>
+        </div>
+        <div class="margin-row">
+          <span>Margem de lucro</span>
+          <span class="stepper"><button type="button" id="m-menos" aria-label="Diminuir margem">−</button><input id="t-margem" class="num" inputmode="decimal" data-k="trabalho.margemPct" data-num aria-label="Margem de lucro em %"><button type="button" id="m-mais" aria-label="Aumentar margem">+</button></span>
+          <span class="hint">% do preço, depois de custos e tributos</span>
+        </div>
+
+        <details class="more" id="mais-ajustes">
+          <summary>Mais ajustes deste trabalho</summary>
+          <div class="row">
+            <label class="f"><span>Terceiros ou subcontratados (R$)</span><input id="t-terceiros" class="num" inputmode="decimal" data-k="trabalho.terceiros" data-num></label>
+            <label class="f"><span>Outros custos (R$)</span><input id="t-outros" class="num" inputmode="decimal" data-k="trabalho.outros" data-num></label>
+            <label class="f"><span>Horas de viagem</span><input id="t-hviagem" class="num" inputmode="decimal" data-k="trabalho.horasViagem" data-num></label>
+            <label class="f"><span>Pedágio e estacionamento (R$)</span><input id="t-pedagio" class="num" inputmode="decimal" data-k="trabalho.pedagios" data-num></label>
+            <label class="f"><span>Comissão e taxas de cartão (%)</span><input id="t-comissao" class="num" inputmode="decimal" data-k="trabalho.comissaoPct" data-num></label>
+            <label class="f" data-show="presumido real simples_hibrido"><span>Compras com CBS/IBS destacado (%)</span><input id="t-credito" class="num" inputmode="decimal" data-k="trabalho.comprasComCreditoPct" data-num></label>
+            <label class="f"><span>Ano do cálculo</span><select id="empresa-ano" data-k="empresa.ano" data-num></select></label>
+          </div>
+        </details>
+      </div></div>
+
+      <aside class="card price" id="preco" aria-live="polite"></aside>
+    </div>
+  </section>
+
+  <!-- ===== Tela 2: empresa e custos (preenchida uma vez) ===== -->
+  <section id="view-empresa" hidden>
+    <div class="cfg">
+      <p class="hint">Preencha uma vez. O app guarda neste aparelho e usa em todos os orçamentos.</p>
+      <div class="card"><div class="body">
+        <h2>Sua empresa</h2>
+        <div class="row">
+          <label class="f"><span>Regime tributário</span>
+            <select id="empresa-regime" data-k="empresa.regime">
+              <option value="mei">MEI</option>
+              <option value="simples">Simples Nacional (CBS/IBS dentro do DAS)</option>
+              <option value="simples_hibrido">Simples Nacional com CBS/IBS por fora</option>
+              <option value="presumido">Lucro Presumido</option>
+              <option value="real">Lucro Real</option>
+            </select></label>
+          <label class="f"><span>Faturamento dos últimos 12 meses (R$)</span><input id="empresa-rbt12" class="num" inputmode="decimal" data-k="empresa.rbt12" data-num></label>
+        </div>
+        <div class="row">
+          <label class="f" data-show="simples simples_hibrido"><span>Anexo do Simples</span>
+            <select id="empresa-anexo" data-k="empresa.anexo"><option value="III">Anexo III</option><option value="IV">Anexo IV</option><option value="V">Anexo V</option></select></label>
+          <label class="f" data-show="simples simples_hibrido"><span>Folha dos últimos 12 meses, com pró-labore (R$)</span><input id="empresa-folha12" class="num" inputmode="decimal" data-k="empresa.folha12" data-num></label>
+          <label class="f" data-show="presumido real"><span>ISS do município (%)</span><input id="empresa-iss" class="num" inputmode="decimal" data-k="empresa.issPct" data-num></label>
+          <label class="f" data-show="mei"><span>DAS-MEI mensal (R$)</span><input id="empresa-dasmei" class="num" inputmode="decimal" data-k="empresa.dasMei" data-num></label>
+        </div>
+        <label class="chk" data-show="presumido real"><input type="checkbox" id="empresa-lucroalto" data-k="empresa.lucroAlto"><span>O lucro passa de R$ 20 mil por mês (adicional de 10% do IRPJ)</span></label>
+        <p class="hint" id="hint-regime"></p>
+      </div></div>
+
+      <div class="card"><div class="body">
+        <h2>Custos fixos do mês</h2>
+        <div class="fixos" id="fixos"></div>
+        <button type="button" class="link" id="add-fixo" style="justify-self:start">+ Adicionar despesa</button>
+        <div class="row">
+          <label class="f"><span>Pró-labore (R$/mês)</span><input id="custos-prolabore" class="num" inputmode="decimal" data-k="custos.proLabore" data-num></label>
+          <label class="f"><span>Salários da equipe (R$/mês)</span><input id="custos-salarios" class="num" inputmode="decimal" data-k="custos.salarios" data-num></label>
+          <label class="f"><span>Encargos sobre salários (%)</span><input id="custos-encargos" class="num" inputmode="decimal" data-k="custos.encargosPct" data-num></label>
+        </div>
+      </div></div>
+
+      <div class="card"><div class="body">
+        <h2>Horas disponíveis</h2>
+        <div class="row">
+          <label class="f"><span>Pessoas que executam o serviço</span><input id="custos-pessoas" class="num" inputmode="decimal" data-k="custos.pessoas" data-num></label>
+          <label class="f"><span>Horas por dia</span><input id="custos-horasdia" class="num" inputmode="decimal" data-k="custos.horasDia" data-num></label>
+          <label class="f"><span>Dias trabalhados no mês</span><input id="custos-dias" class="num" inputmode="decimal" data-k="custos.diasMes" data-num></label>
+          <label class="f"><span>Produtividade (%)</span><input id="custos-prod" class="num" inputmode="decimal" data-k="custos.produtividadePct" data-num></label>
+          <label class="f"><span>Custo por km rodado (R$)</span><input id="t-rskm" class="num" inputmode="decimal" data-k="trabalho.rsKm" data-num></label>
+        </div>
+        <div class="total-line"><span>Custo da hora produtiva</span><b id="out-custohora">–</b></div>
+      </div></div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="primary" id="cfg-pronto">Pronto, fazer orçamento</button>
+        <button type="button" id="btn-exemplo">Usar dados de exemplo</button>
+        <button type="button" id="btn-limpar">Apagar tudo e começar do zero</button>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">Cálculo orientativo com as regras da LC 214/2025 e LC 123/2006 vigentes em novembro de 2026 e alíquotas de referência estimadas (CBS 8,8% e IBS 17,7% a partir de 2033). Confirme com seu contador antes de fechar preços. Os dados ficam só neste aparelho.</p>
+</div>
+<div class="mobilebar" id="mobilebar"><span>Cobre</span><b id="mb-total">–</b><button type="button" id="mb-ver">Ver detalhes</button></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="calc.js"></script>
+<script src="app.js"></script>
+<!--BODY-END-->
+</body>
+</html>
